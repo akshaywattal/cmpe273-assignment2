@@ -20,7 +20,8 @@ public class RootResource {
     public RootResource() {
 	// do nothing
     }
-
+    
+    
     @GET
     @Timed(name = "get-root")
     public Response getRoot() {

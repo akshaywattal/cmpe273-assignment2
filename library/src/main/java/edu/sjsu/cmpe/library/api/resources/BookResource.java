@@ -1,5 +1,6 @@
 package edu.sjsu.cmpe.library.api.resources;
 
+import javax.jms.Connection;
 import javax.validation.Valid;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -23,6 +24,7 @@ import edu.sjsu.cmpe.library.dto.BookDto;
 import edu.sjsu.cmpe.library.dto.BooksDto;
 import edu.sjsu.cmpe.library.dto.LinkDto;
 import edu.sjsu.cmpe.library.repository.BookRepositoryInterface;
+import edu.sjsu.cmpe.library.stomp.ApolloSTOMP;
 
 @Path("/v1/books")
 @Produces(MediaType.APPLICATION_JSON)
@@ -30,79 +32,118 @@ import edu.sjsu.cmpe.library.repository.BookRepositoryInterface;
 public class BookResource {
     /** bookRepository instance */
     private final BookRepositoryInterface bookRepository;
+    
+    /** apolloSTOMP instance */
+    private ApolloSTOMP apolloSTOMP; 
+    
+    /** flag that denotes if book is already lost or not */
+    private static boolean alreadyLost= false;
 
     /**
      * BookResource constructor
      * 
      * @param bookRepository
      *            a BookRepository instance
+     * @param apolloSTOMP
+     *            a ApolloSTOMP instance           
+     *            
      */
-    public BookResource(BookRepositoryInterface bookRepository) {
+    public BookResource(BookRepositoryInterface bookRepository, ApolloSTOMP apolloSTOMP) {
 	this.bookRepository = bookRepository;
+	this.apolloSTOMP = apolloSTOMP;
     }
-
+    
+    /*
+     * API to view book based on ISBN
+     */
     @GET
     @Path("/{isbn}")
     @Timed(name = "view-book")
     public BookDto getBookByIsbn(@PathParam("isbn") LongParam isbn) {
-	Book book = bookRepository.getBookByISBN(isbn.get());
-	BookDto bookResponse = new BookDto(book);
-	bookResponse.addLink(new LinkDto("view-book", "/books/" + book.getIsbn(),
-		"GET"));
-	bookResponse.addLink(new LinkDto("update-book-status", "/books/"
-		+ book.getIsbn(), "PUT"));
-	// add more links
+    	Book book = bookRepository.getBookByISBN(isbn.get());
+	
+    	BookDto bookResponse = new BookDto(book);
+    	bookResponse.addLink(new LinkDto("view-book", "/books/" + book.getIsbn(), "GET"));
+    	bookResponse.addLink(new LinkDto("update-book-status","/books/" + book.getIsbn(), "PUT"));
+    	bookResponse.addLink(new LinkDto("delete-book","/books/" + book.getIsbn(), "DELETE"));
+    	bookResponse.addLink(new LinkDto("view-all-books","/books/", "GET"));
 
 	return bookResponse;
     }
-
+    
+    /*
+     * API to create a new Book, NOT USED IN ASSIGNMENT -2 USE CASE
+     */
     @POST
     @Timed(name = "create-book")
     public Response createBook(@Valid Book request) {
-	// Store the new book in the BookRepository so that we can retrieve it.
-	Book savedBook = bookRepository.saveBook(request);
+    	// Store the new book in the BookRepository so that we can retrieve it.
+    	Book savedBook = bookRepository.saveBook(request);
 
-	String location = "/books/" + savedBook.getIsbn();
-	BookDto bookResponse = new BookDto(savedBook);
-	bookResponse.addLink(new LinkDto("view-book", location, "GET"));
-	bookResponse
-	.addLink(new LinkDto("update-book-status", location, "PUT"));
+    	String location = "/books/" + savedBook.getIsbn();
+    	BookDto bookResponse = new BookDto(savedBook);
+    	bookResponse.addLink(new LinkDto("view-book", location, "GET"));
+    	bookResponse.addLink(new LinkDto("update-book-status", location, "PUT"));
+    	bookResponse.addLink(new LinkDto("delete-book",location, "DELETE"));
+    	bookResponse.addLink(new LinkDto("view-all-books","/books/", "GET"));
 
 	return Response.status(201).entity(bookResponse).build();
     }
-
+    
+    /*
+     * API to View all Books
+     */
     @GET
-    @Path("/")
     @Timed(name = "view-all-books")
     public BooksDto getAllBooks() {
-	BooksDto booksResponse = new BooksDto(bookRepository.getAllBooks());
-	booksResponse.addLink(new LinkDto("create-book", "/books", "POST"));
+	
+    	BooksDto booksResponse = new BooksDto(bookRepository.getAllBooks());
+    	booksResponse.addLink(new LinkDto("create-book", "/books", "POST"));
 
 	return booksResponse;
     }
-
+    
+    /*
+     * API to Update Book Status
+     */
     @PUT
     @Path("/{isbn}")
     @Timed(name = "update-book-status")
     public Response updateBookStatus(@PathParam("isbn") LongParam isbn,
-	    @DefaultValue("available") @QueryParam("status") Status status) {
-	Book book = bookRepository.getBookByISBN(isbn.get());
-	book.setStatus(status);
-
-	BookDto bookResponse = new BookDto(book);
-	String location = "/books/" + book.getIsbn();
-	bookResponse.addLink(new LinkDto("view-book", location, "GET"));
+	    @DefaultValue("available") @QueryParam("status") Status status) throws Exception {
+	
+    	Book book = bookRepository.getBookByISBN(isbn.get());
+    	
+    	/*
+    	 * Publish message to Queue if Book is lost (one message only per lost book)
+    	 */
+    	if (status.getValue()=="lost" && book.getStatus() == Status.available) {
+    		book.setStatus(status);
+    		Connection connect = apolloSTOMP.makeConnection();
+    		apolloSTOMP.sendQueueMessage(connect,book.getIsbn());
+    		apolloSTOMP.endConnection(connect);	
+    	}
+	
+    	BookDto bookResponse = new BookDto(book);
+    	String location = "/books/" + book.getIsbn();
+    	bookResponse.addLink(new LinkDto("view-book", location, "GET"));
+    	bookResponse.addLink(new LinkDto("delete-book",location, "DELETE"));
+    	bookResponse.addLink(new LinkDto("view-all-books","/books/", "GET"));
 
 	return Response.status(200).entity(bookResponse).build();
     }
-
+    
+    /*
+     * API to Delete book
+     */
     @DELETE
     @Path("/{isbn}")
     @Timed(name = "delete-book")
-    public BookDto deleteBook(@PathParam("isbn") LongParam isbn) {
-	bookRepository.delete(isbn.get());
-	BookDto bookResponse = new BookDto(null);
-	bookResponse.addLink(new LinkDto("create-book", "/books", "POST"));
+    public BookDto deleteBook(@PathParam("isbn") LongParam isbn) throws Exception {
+    
+    	bookRepository.delete(isbn.get());
+    	BookDto bookResponse = new BookDto(null);
+    	bookResponse.addLink(new LinkDto("create-book", "/books", "POST"));
 
 	return bookResponse;
     }

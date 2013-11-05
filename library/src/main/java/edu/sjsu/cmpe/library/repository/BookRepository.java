@@ -32,7 +32,7 @@ public class BookRepository implements BookRepositoryInterface {
 	try {
 	    book.setCoverimage(new URL("http://goo.gl/N96GJN"));
 	} catch (MalformedURLException e) {
-	    // eat the exception
+		e.printStackTrace();
 	}
 	bookMap.put(book.getIsbn(), book);
 
@@ -43,7 +43,7 @@ public class BookRepository implements BookRepositoryInterface {
 	try {
 	    book.setCoverimage(new URL("http://goo.gl/ZGmzoJ"));
 	} catch (MalformedURLException e) {
-	    // eat the exception
+		e.printStackTrace();
 	}
 	bookMap.put(book.getIsbn(), book);
 
@@ -57,7 +57,7 @@ public class BookRepository implements BookRepositoryInterface {
      * @return a new incremental ISBN number
      */
     private final Long generateISBNKey() {
-	// increment existing isbnKey and return the new value
+	// Increment existing isbnKey and return the new value
 	return Long.valueOf(++isbnKey);
     }
 
@@ -66,14 +66,11 @@ public class BookRepository implements BookRepositoryInterface {
      */
     @Override
     public Book saveBook(Book newBook) {
-	checkNotNull(newBook, "newBook instance must not be null");
-	// Generate new ISBN
-	Long isbn = generateISBNKey();
-	newBook.setIsbn(isbn);
-	// TODO: create and associate other fields such as author
-
-	// Finally, save the new book into the map
-	bookInMemoryMap.putIfAbsent(isbn, newBook);
+    	checkNotNull(newBook, "newBook instance must not be null");
+    	/** Commented below code, NOT required for Assignment-2 Use Case*/
+    	//Long isbn = generateISBNKey();
+    	//newBook.setIsbn(isbn);
+    	bookInMemoryMap.putIfAbsent(newBook.getIsbn(), newBook);
 
 	return newBook;
     }
