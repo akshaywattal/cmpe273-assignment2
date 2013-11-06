@@ -1,6 +1,9 @@
 package edu.sjsu.cmpe.library.api.resources;
 
+import java.net.URL;
+
 import javax.jms.Connection;
+import javax.jms.TextMessage;
 import javax.validation.Valid;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -36,9 +39,6 @@ public class BookResource {
     /** apolloSTOMP instance */
     private ApolloSTOMP apolloSTOMP; 
     
-    /** flag that denotes if book is already lost or not */
-    private static boolean alreadyLost= false;
-
     /**
      * BookResource constructor
      * 
@@ -146,6 +146,48 @@ public class BookResource {
     	bookResponse.addLink(new LinkDto("create-book", "/books", "POST"));
 
 	return bookResponse;
+    }
+    
+    /*
+     * API to update Library
+     */
+    @POST
+    @Path("/update")
+    @Timed(name = "update-library")
+    public Response updateLibrary(@Valid String msg) throws Exception {
+    	
+    	String[] finalMessage=msg.split(":", 4); 
+        Long isbn = Long.valueOf(finalMessage[0]);
+        Status status = Status.available;
+
+        Book book = bookRepository.getBookByISBN(isbn);
+        
+        /**If book received from Publisher is equal to lost book, update status*/
+        if (book != null && book.getStatus()==Status.lost) {
+        	book.setStatus(status);
+        	System.out.println("Updated status as AVAILABLE for book with ISBN " + book.getIsbn());
+        }
+        
+        /**If book received from Publisher is new book, add to hashmap*/
+        else if (book == null){
+        	String title = finalMessage[1];
+        	String category = finalMessage[2];
+        	URL coverImage = new URL(finalMessage[3]);
+        	Book book1 = new Book();
+        	book1.setIsbn(isbn);
+        	book1.setTitle(title);
+        	book1.setCategory(category);
+        	book1.setCoverimage(coverImage);
+        	bookRepository.saveBook(book1);
+        	System.out.println("Added new book with ISBN " + book1.getIsbn() + " to library");
+        }
+        
+        /**Book already present in library*/
+        else {
+        	System.out.println("Book with ISBN " + book.getIsbn() + " already AVAILABLE in Library");
+        }
+
+	return Response.ok().build();
     }
 }
 
