@@ -1,7 +1,7 @@
 $(document).ready(function() {  
 	if(window.WebSocket) {
         var client, destination;
-        var url="ws://54.215.210.214:61623";
+        var url="ws://54.219.156.168:61623";
         var login = "admin";
         var passcode = "password"
         var libPort = location.port;
