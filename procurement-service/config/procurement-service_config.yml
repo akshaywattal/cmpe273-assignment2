@@ -14,7 +14,7 @@ stompTopicName: /topic/41816.book.
 apolloUser: "admin"
 apolloPassword: "password"
 apolloHost: "54.219.156.168"
-apolloPort: 61613	
+apolloPort: 61613
 
 # HTTP-specific options.
 http:
