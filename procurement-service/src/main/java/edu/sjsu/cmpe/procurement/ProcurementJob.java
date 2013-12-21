@@ -49,7 +49,7 @@ public class ProcurementJob extends Job{
 	    try {
 	    	String message;
 	    	Client client = Client.create();
-	    	String url = "http://54.215.210.214:9000/orders/41816";	
+	    	String url = "http://54.219.156.168:9000/orders/41816";	
 	    	WebResource webResource = client.resource(url);
 	    	ShippedBook response = webResource.accept("application/json")
 	    			.type("application/json").get(ShippedBook.class);
